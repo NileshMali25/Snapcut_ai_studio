@@ -1,0 +1,162 @@
+import { useState, useCallback } from "react";
+import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Upload, Image, Download, Sparkles, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+const Dashboard = () => {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFile = useCallback((f: File) => {
+    if (f.size > 10 * 1024 * 1024) return;
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(f.type)) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  }, [handleFile]);
+
+  const handleProcess = () => {
+    setProcessing(true);
+    setTimeout(() => setProcessing(false), 3000);
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
+  };
+
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <div className="pt-24 pb-12 px-4">
+        <div className="container mx-auto max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-10">
+            <h1 className="font-display font-bold text-3xl mb-2">
+              Remove <span className="text-gradient-brand">Background</span>
+            </h1>
+            <p className="text-muted-foreground">Upload an image to get started</p>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            {[
+              { label: "Credits Left", value: "5", icon: Sparkles },
+              { label: "Processed Today", value: "0", icon: Image },
+              { label: "Downloads", value: "0", icon: Download },
+            ].map((stat) => (
+              <div key={stat.label} className="glass rounded-xl p-4 text-center">
+                <stat.icon className="w-5 h-5 text-snap-sky mx-auto mb-1" />
+                <div className="font-display font-bold text-xl">{stat.value}</div>
+                <div className="text-xs text-muted-foreground">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Upload area */}
+          <AnimatePresence mode="wait">
+            {!file ? (
+              <motion.div
+                key="upload"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                className={`relative rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${
+                  dragOver
+                    ? "dashed-selection bg-snap-sky/5 glow-blue"
+                    : "border-2 border-dashed border-border hover:border-snap-sky/40 hover:bg-muted/20"
+                }`}
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/jpeg,image/png,image/webp";
+                  input.onchange = (e) => {
+                    const f = (e.target as HTMLInputElement).files?.[0];
+                    if (f) handleFile(f);
+                  };
+                  input.click();
+                }}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-gradient-brand flex items-center justify-center mx-auto mb-4">
+                  <Upload className="w-8 h-8 text-background" />
+                </div>
+                <h3 className="font-display font-semibold text-lg mb-2">
+                  Drop your image here
+                </h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  or click to browse — JPG, PNG, WEBP up to 10MB
+                </p>
+                <Button variant="brand" size="sm">Choose File</Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="preview"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="glass rounded-2xl p-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-medium truncate max-w-xs">{file.name}</span>
+                  <button onClick={clearFile} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Original */}
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Original</div>
+                    <div className="rounded-xl overflow-hidden border border-border aspect-square bg-muted/30 flex items-center justify-center">
+                      <img src={preview!} alt="Original" className="max-w-full max-h-full object-contain" />
+                    </div>
+                  </div>
+
+                  {/* Result */}
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-2">Result</div>
+                    <div className="rounded-xl overflow-hidden border-2 border-dashed border-snap-sky/30 aspect-square bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] flex items-center justify-center">
+                      {processing ? (
+                        <div className="text-center">
+                          <div className="w-12 h-12 rounded-full border-2 border-snap-sky border-t-transparent animate-spin mx-auto mb-3" />
+                          <p className="text-sm text-muted-foreground">Processing...</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Click process to start</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <Button variant="brand" className="flex-1" onClick={handleProcess} disabled={processing}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    {processing ? "Processing..." : "Remove Background"}
+                  </Button>
+                  <Button variant="brand-outline" disabled>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
