@@ -5,9 +5,10 @@ import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 const navLinks = [
-  { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "API", href: "#api" },
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "History", href: "/history" },
+  { label: "Features", href: "/#features" },
+  { label: "Pricing", href: "/#pricing" },
 ];
 
 export function Navbar() {
@@ -25,13 +26,13 @@ export function Navbar() {
 
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.label}
-              href={link.href}
+              to={link.href}
               className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </div>
 
@@ -55,14 +56,14 @@ export function Navbar() {
       {open && (
         <div className="md:hidden glass-strong border-t border-border px-4 py-4 space-y-3">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.label}
-              href={link.href}
+              to={link.href}
               className="block text-muted-foreground hover:text-foreground text-sm"
               onClick={() => setOpen(false)}
             >
               {link.label}
-            </a>
+            </Link>
           ))}
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" size="sm" asChild>

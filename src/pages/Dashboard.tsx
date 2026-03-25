@@ -1,14 +1,18 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Upload, Image, Download, Sparkles, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { removeBackground } from "@imgly/background-removal";
 
 const Dashboard = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [progressMsg, setProgressMsg] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((f: File) => {
     if (f.size > 10 * 1024 * 1024) return;
@@ -24,14 +28,72 @@ const Dashboard = () => {
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
   }, [handleFile]);
 
-  const handleProcess = () => {
+  const handleProcess = async () => {
+    if (!file) return;
     setProcessing(true);
-    setTimeout(() => setProcessing(false), 3000);
+    setProgressMsg("Initializing AI...");
+    try {
+      const imageBlob = await removeBackground(file, {
+        model: "isnet_fp16",
+        progress: (key, current, total) => {
+          if (key.includes("fetch")) {
+            setProgressMsg(`Downloading AI model: ${Math.round((current / total) * 100)}%`);
+          } else {
+            setProgressMsg("Processing image...");
+          }
+        }
+      });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        try {
+           const historyStr = localStorage.getItem("snapcut_history") || "[]";
+           const history = JSON.parse(historyStr);
+           history.unshift({
+             id: Date.now().toString(),
+             result: base64data,
+             date: new Date().toISOString()
+           });
+           if (history.length > 10) history.length = 10;
+           localStorage.setItem("snapcut_history", JSON.stringify(history));
+        } catch(e) { console.error("Could not save history limit reached", e); }
+        setProcessedImage(base64data);
+      };
+      reader.readAsDataURL(imageBlob);
+    } catch (error) {
+      console.error("Background removal failed:", error);
+      setProcessedImage(preview);
+    } finally {
+      setProcessing(false);
+    }
   };
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const pastedFile = items[i].getAsFile();
+          if (pastedFile) {
+            handleFile(pastedFile);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [handleFile]);
 
   const clearFile = () => {
     setFile(null);
     setPreview(null);
+    setProcessedImage(null);
+    setProgressMsg("");
   };
 
   return (
@@ -78,17 +140,19 @@ const Dashboard = () => {
                     ? "dashed-selection bg-snap-sky/5 glow-blue"
                     : "border-2 border-dashed border-border hover:border-snap-sky/40 hover:bg-muted/20"
                 }`}
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/jpeg,image/png,image/webp";
-                  input.onchange = (e) => {
-                    const f = (e.target as HTMLInputElement).files?.[0];
-                    if (f) handleFile(f);
-                  };
-                  input.click();
-                }}
+                onClick={() => fileInputRef.current?.click()}
               >
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                    e.target.value = "";
+                  }}
+                />
                 <div className="w-16 h-16 rounded-2xl bg-gradient-brand flex items-center justify-center mx-auto mb-4">
                   <Upload className="w-8 h-8 text-background" />
                 </div>
@@ -127,12 +191,15 @@ const Dashboard = () => {
                   {/* Result */}
                   <div>
                     <div className="text-xs text-muted-foreground mb-2">Result</div>
-                    <div className="rounded-xl overflow-hidden border-2 border-dashed border-snap-sky/30 aspect-square bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] flex items-center justify-center">
+                    <div className="rounded-xl overflow-hidden border-2 border-dashed border-snap-sky/30 aspect-square bg-[repeating-conic-gradient(hsl(var(--muted))_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] flex items-center justify-center relative">
                       {processing ? (
-                        <div className="text-center">
+                        <div className="text-center w-full px-4">
                           <div className="w-12 h-12 rounded-full border-2 border-snap-sky border-t-transparent animate-spin mx-auto mb-3" />
-                          <p className="text-sm text-muted-foreground">Processing...</p>
+                          <p className="text-sm text-foreground font-medium mb-1">{progressMsg}</p>
+                          <p className="text-xs text-muted-foreground w-full break-words max-w-xs mx-auto">First time setup downloads a 40MB model. Subsequent runs are instant!</p>
                         </div>
+                      ) : processedImage ? (
+                        <img src={processedImage} alt="Result" className="max-w-full max-h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
                       ) : (
                         <p className="text-sm text-muted-foreground">Click process to start</p>
                       )}
@@ -141,11 +208,22 @@ const Dashboard = () => {
                 </div>
 
                 <div className="flex gap-3 mt-6">
-                  <Button variant="brand" className="flex-1" onClick={handleProcess} disabled={processing}>
+                  <Button variant="brand" className="flex-1" onClick={handleProcess} disabled={processing || !!processedImage}>
                     <Sparkles className="w-4 h-4 mr-2" />
-                    {processing ? "Processing..." : "Remove Background"}
+                    {processing ? "Processing..." : processedImage ? "Processed" : "Remove Background"}
                   </Button>
-                  <Button variant="brand-outline" disabled>
+                  <Button 
+                    variant="brand-outline" 
+                    disabled={!processedImage}
+                    onClick={() => {
+                      if (processedImage) {
+                        const link = document.createElement("a");
+                        link.href = processedImage;
+                        link.download = "snapcut-result.png";
+                        link.click();
+                      }
+                    }}
+                  >
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
