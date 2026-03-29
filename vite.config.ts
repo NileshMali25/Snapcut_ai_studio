@@ -11,6 +11,13 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/api/webhook': {
+        target: 'https://nileshmali.app.n8n.cloud',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/webhook/, '/webhook-test/Remove%20background')
+      }
+    }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

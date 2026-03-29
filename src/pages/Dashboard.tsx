@@ -3,8 +3,6 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Upload, Image, Download, Sparkles, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { removeBackground } from "@imgly/background-removal";
-
 const Dashboard = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -31,38 +29,45 @@ const Dashboard = () => {
   const handleProcess = async () => {
     if (!file) return;
     setProcessing(true);
-    setProgressMsg("Initializing AI...");
+    setProgressMsg("Uploading and processing image...");
+
     try {
-      const imageBlob = await removeBackground(file, {
-        model: "isnet_fp16",
-        progress: (key, current, total) => {
-          if (key.includes("fetch")) {
-            setProgressMsg(`Downloading AI model: ${Math.round((current / total) * 100)}%`);
-          } else {
-            setProgressMsg("Processing image...");
-          }
-        }
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Send the image strictly using the proxy to bypass CORS
+      const response = await fetch("/api/webhook", {
+        method: "POST",
+        body: formData,
       });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
+
+      if (!response.ok) {
+        throw new Error(`Webhook failed with status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.url) {
         try {
            const historyStr = localStorage.getItem("snapcut_history") || "[]";
            const history = JSON.parse(historyStr);
            history.unshift({
              id: Date.now().toString(),
-             result: base64data,
+             result: data.url,
              date: new Date().toISOString()
            });
-           if (history.length > 10) history.length = 10;
-           localStorage.setItem("snapcut_history", JSON.stringify(history));
-        } catch(e) { console.error("Could not save history limit reached", e); }
-        setProcessedImage(base64data);
-      };
-      reader.readAsDataURL(imageBlob);
-    } catch (error) {
+           localStorage.setItem("snapcut_history", JSON.stringify(history.slice(0, 10)));
+        } catch(e) {}
+        
+        setProcessedImage(data.url);
+      } else {
+        throw new Error("Webhook response did not contain a URL");
+      }
+    } catch (error: any) {
       console.error("Background removal failed:", error);
-      setProcessedImage(preview);
+      import("sonner").then(({ toast }) => {
+        toast.error(error.message || "Failed to process image. Make sure your n8n workflow is correctly set up, active, and functioning.");
+      });
     } finally {
       setProcessing(false);
     }
@@ -89,6 +94,33 @@ const Dashboard = () => {
     return () => window.removeEventListener("paste", handlePaste);
   }, [handleFile]);
 
+  const [historyCount, setHistoryCount] = useState(0);
+  const [downloadCount, setDownloadCount] = useState(0);
+
+  useEffect(() => {
+    try {
+      const historyStr = localStorage.getItem("snapcut_history") || "[]";
+      const historyArr = JSON.parse(historyStr);
+      setHistoryCount(historyArr.length);
+      
+      const dlCount = localStorage.getItem("snapcut_downloads") || "0";
+      setDownloadCount(parseInt(dlCount));
+    } catch (e) {}
+  }, [processedImage]);
+
+  const handleDownload = () => {
+    if (processedImage) {
+      const newDls = downloadCount + 1;
+      setDownloadCount(newDls);
+      localStorage.setItem("snapcut_downloads", newDls.toString());
+      
+      const link = document.createElement("a");
+      link.href = processedImage;
+      link.download = "snapcut-result.png";
+      link.click();
+    }
+  };
+
   const clearFile = () => {
     setFile(null);
     setPreview(null);
@@ -112,9 +144,9 @@ const Dashboard = () => {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
-              { label: "Credits Left", value: "5", icon: Sparkles },
-              { label: "Processed Today", value: "0", icon: Image },
-              { label: "Downloads", value: "0", icon: Download },
+              { label: "Credits Left", value: "∞", icon: Sparkles },
+              { label: "Processed Today", value: historyCount.toString(), icon: Image },
+              { label: "Downloads", value: downloadCount.toString(), icon: Download },
             ].map((stat) => (
               <div key={stat.label} className="glass rounded-xl p-4 text-center">
                 <stat.icon className="w-5 h-5 text-snap-sky mx-auto mb-1" />
@@ -196,7 +228,7 @@ const Dashboard = () => {
                         <div className="text-center w-full px-4">
                           <div className="w-12 h-12 rounded-full border-2 border-snap-sky border-t-transparent animate-spin mx-auto mb-3" />
                           <p className="text-sm text-foreground font-medium mb-1">{progressMsg}</p>
-                          <p className="text-xs text-muted-foreground w-full break-words max-w-xs mx-auto">First time setup downloads a 40MB model. Subsequent runs are instant!</p>
+                          <p className="text-xs text-muted-foreground w-full break-words max-w-xs mx-auto">Sending image to cloud processing server...</p>
                         </div>
                       ) : processedImage ? (
                         <img src={processedImage} alt="Result" className="max-w-full max-h-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
@@ -215,14 +247,7 @@ const Dashboard = () => {
                   <Button 
                     variant="brand-outline" 
                     disabled={!processedImage}
-                    onClick={() => {
-                      if (processedImage) {
-                        const link = document.createElement("a");
-                        link.href = processedImage;
-                        link.download = "snapcut-result.png";
-                        link.click();
-                      }
-                    }}
+                    onClick={handleDownload}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download
