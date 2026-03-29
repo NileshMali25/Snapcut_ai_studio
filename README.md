@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Snapcut_ai_studio
 
-TODO: Document your project here
+Welcome to SnapCut AI Studio project.
