@@ -103,9 +103,33 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <Button variant={plan.variant} className="w-full" asChild>
-                <Link to="/register">{plan.cta}</Link>
-              </Button>
+              {plan.price === "₹0" ? (
+                <Button variant={plan.variant} className="w-full" asChild>
+                  <Link to="/register">{plan.cta}</Link>
+                </Button>
+              ) : (
+                <Button 
+                  variant={plan.variant} 
+                  className="w-full" 
+                  onClick={() => {
+                    import("@/lib/razorpay").then(({ displayRazorpay }) => {
+                      const amount = plan.price === "₹499" ? 49900 : 9900;
+                      displayRazorpay({
+                        amount,
+                        name: "SnapCut AI",
+                        description: plan.name + " Plan",
+                      }, (response) => {
+                        import("sonner").then(({ toast }) => {
+                          toast.success(`Payment Successful for ${plan.name} Plan!`);
+                        });
+                        console.log("Payment ID:", response.razorpay_payment_id);
+                      });
+                    });
+                  }}
+                >
+                  {plan.cta}
+                </Button>
+              )}
             </motion.div>
           ))}
         </div>
