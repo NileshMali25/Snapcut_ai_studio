@@ -9,6 +9,12 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
 import NotFound from "./pages/NotFound";
+import AboutUs from "./pages/legal/AboutUs";
+import ContactUs from "./pages/legal/ContactUs";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsAndConditions from "./pages/legal/TermsAndConditions";
+import RefundPolicy from "./pages/legal/RefundPolicy";
+import ShippingPolicy from "./pages/legal/ShippingPolicy";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +30,15 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/history" element={<History />} />
+          
+          {/* Legal / Policy Routes */}
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/refund" element={<RefundPolicy />} />
+          <Route path="/shipping" element={<ShippingPolicy />} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

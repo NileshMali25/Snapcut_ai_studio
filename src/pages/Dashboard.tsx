@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Upload, Image, Download, Sparkles, X } from "lucide-react";
+import { Upload, Image, Download, Sparkles, X, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { displayRazorpay } from "@/lib/razorpay";
+import { toast } from "sonner";
 const Dashboard = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -127,6 +129,17 @@ const Dashboard = () => {
     setProcessedImage(null);
     setProgressMsg("");
   };
+  const handleBuyCredits = () => {
+    displayRazorpay({
+      amount: 49900, // Amount in paise (₹499)
+      name: "SnapCut AI",
+      description: "Pro Upgrade (Unlimited Credits)",
+    }, (response) => {
+      // Success Callback
+      toast.success("Payment Successful! Your account has been upgraded.");
+      console.log("Payment ID:", response.razorpay_payment_id);
+    });
+  };
 
   return (
     <div className="min-h-screen">
@@ -138,7 +151,11 @@ const Dashboard = () => {
             <h1 className="font-display font-bold text-3xl mb-2">
               Remove <span className="text-gradient-brand">Background</span>
             </h1>
-            <p className="text-muted-foreground">Upload an image to get started</p>
+            <p className="text-muted-foreground mb-4">Upload an image to get started</p>
+            <Button onClick={handleBuyCredits} variant="brand" className="shadow-lg shadow-snap-purple/20">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Upgrade to Pro (₹499)
+            </Button>
           </div>
 
           {/* Stats */}
